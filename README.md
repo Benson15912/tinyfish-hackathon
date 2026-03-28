@@ -1,99 +1,115 @@
-
 # adulting.sg
 
-## 🧠 Overview
+## because no one teaches you this stuff
 
-**adulting.sg** is a personal lifestyle assistant designed to help young adults in Singapore make smarter life decisions based on their profile.
+Getting your first credit card, balloting for a BTO, figuring out your CPF… every Singaporean goes through it, and most of us figure it out along the way through Reddit threads, random articles, or asking friends.
 
-By combining structured user data with browser automation powered by TinyFish, the application generates actionable insights across key areas like finances and housing — two of the most important aspects of adulting in Singapore.
+**adulting.sg** is built to change that.
+
+It is a personalised financial co-pilot for young adults in Singapore that actually does the research for you.
 
 ---
 
-## 🎯 Goals
+## 💡 What It Does
 
-Our goal is to simplify “adulting” by:
+adulting.sg takes in your **real profile**  
+income, spending, preferences, life stage
 
-* Recommending suitable **credit cards** based on spending habits and lifestyle
-* Breaking down **pros and cons** of each recommendation clearly
-* Discovering **upcoming BTO launches** near a user’s preferred locations
-* Helping users make informed, data-driven life decisions with minimal effort
+Then it:
+- goes out to the web in real time
+- browses the same sites you would
+- comes back with answers tailored to you
+
+No generic advice. No static content.
+
+---
+
+## 🔑 Core Features
+
+### 💳 Credit Cards
+Not just a list.
+
+adulting.sg browses sites like MoneySmart, SingSaver, and bank pages live, then:
+- ranks the best cards for your spending habits
+- explains real pros and cons
+- gives a clear verdict on what suits you
+
+---
+
+### 🏠 BTO Finder
+Stop manually checking launches.
+
+- pulls upcoming HDB BTO projects
+- maps them across Singapore
+- ranks them based on your preferred location, budget, and flat type
+- shows a simple checklist and grant eligibility
+
+---
+
+### 🤖 Ask Anything
+A research agent for “adulting” questions.
+
+Ask things like:
+- which CPF scheme applies to me?
+- how much do I need for a BTO?
+- what taxes do I pay?
+
+The agent:
+- browses official sources like CPF, HDB, IRAS, MoneySense
+- answers based on your profile
+- uses live data instead of generic responses
 
 ---
 
 ## ⚙️ How It Works
 
-### 1. User Profile
+1. **User Profile**
+   - income
+   - spending patterns
+   - preferences
+   - goals
 
-The application maintains a structured user profile containing:
+2. **Tinyfish Automation**
+   - browses websites in real time
+   - extracts relevant data
+   - mimics how a human would research
 
-* Income and spending patterns
-* Lifestyle preferences (e.g. dining, travel, transport)
-* Preferred housing locations
+3. **Decision Layer**
+   - matches your profile with live data
+   - ranks and filters results
+   - generates clear recommendations
 
-This acts as the **single source of truth** for all recommendations.
-
----
-
-### 2. TinyFish Browser Automation
-
-Using TinyFish, the app dynamically gathers real-time information from various sources:
-
-* Credit card offerings from banks
-* Promotions, benefits, and eligibility criteria
-* Upcoming BTO project listings and launch details
-
-This ensures recommendations are always **fresh and relevant**.
-
----
-
-### 3. Intelligent Recommendation Engine
-
-The system processes:
-
-* User profile data
-* Scraped web data
-
-It then generates:
-
-* Personalized credit card suggestions
-* Clear comparisons (benefits, fees, suitability)
-* Location-based BTO recommendations
+4. **Output**
+   - simple summaries
+   - pros and cons
+   - actionable next steps
 
 ---
 
-### 4. Output
+## 🔒 Privacy First
 
-Insights are presented in a clean, human-readable format such as:
-
-* Markdown reports (`profile.md`)
-* Structured summaries
-* Actionable recommendations
-
----
-
-## 🧩 Features
-
-### 💳 Credit Card Advisor
-
-* Matches cards to your spending habits
-* Highlights cashback, miles, or rewards optimization
-* Explains trade-offs (fees vs benefits)
+- runs locally
+- no accounts
+- no backend
+- your data stays on your device
 
 ---
 
-### 🏠 BTO Discovery
+## 🚀 Why We Built This
 
-* Finds upcoming BTO launches near preferred areas
-* Surfaces key details (location, timeline, eligibility)
-* Helps assess readiness based on financial profile
+We realised most “personal finance tools” are:
+- dashboards you have to interpret
+- generic advice that does not apply to you
+- static content that gets outdated
+
+We wanted something different.
+
+Something that:
+- understands your situation
+- does the research for you
+- tells you what actually makes sense
 
 ---
-
-### 📊 Lifestyle Insights
-
-* Detects patterns in spending and behavior
-* Suggests optimizations (e.g. reduce subscriptions, increase savings)
-* Aligns actions with long-term goals
 
 ---
 
