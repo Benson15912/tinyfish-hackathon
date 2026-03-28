@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:docs.tinyfish.ai)",
+      "Bash(npx vite:*)",
+      "WebFetch(domain:agent.tinyfish.ai)",
+      "WebSearch"
+    ]
+  }
+}
