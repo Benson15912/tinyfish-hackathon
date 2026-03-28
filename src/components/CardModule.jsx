@@ -1,23 +1,14 @@
 // components/CardModule.jsx
-import { useState, useEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
+import { useState } from 'react'
 import { runAutomationSSE, buildCardAutofillTask, personaliseCardList, extractResultText } from '../lib/tinyfish'
-import { getCardVerdictAI, compareCardsAI } from '../lib/openai'
-import { findCardInDatabase, generateFallbackBreakdown } from '../lib/cardDatabase'
+import { generateFallbackBreakdown } from '../lib/cardDatabase'
 import { parseProfile } from '../lib/profile'
 import { AutofillPanel } from './AutofillPanel'
 import { BrowserPanel } from './BrowserPanel'
 
 export function CardModule({ profileMd, apiKey }) {
   const [panel, setPanel] = useState(null)
-
-  // Verdict (Tinyfish)
-  const [verdict, setVerdict] = useState('')
-  const [verdictLoading, setVerdictLoading] = useState(false)
-
-  // Comparison (Tinyfish)
-  const [comparison, setComparison] = useState('')
-  const [comparisonLoading, setComparisonLoading] = useState(false)
+  const [panelVisible, setPanelVisible] = useState(false)
 
   // Personalised card list (Tinyfish) — cached in localStorage
   const CARDS_CACHE_KEY = 'adulting_sg_personalised_cards'
@@ -50,12 +41,6 @@ export function CardModule({ profileMd, apiKey }) {
   const profile = parseProfile(profileMd)
 
   // Auto-generate card list on first visit (no cache)
-  useEffect(() => {
-    if (!profile.income_monthly) return
-    if (localStorage.getItem(CARDS_CACHE_KEY)) return
-    refreshCardList()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   // ─── Tinyfish: card list ─────────────────────────────────────────────────
 
   function refreshCardList() {
@@ -63,8 +48,6 @@ export function CardModule({ profileMd, apiKey }) {
     localStorage.removeItem(BREAKDOWNS_CACHE_KEY)
     setBreakdowns({})
     setExpanded({})
-    setVerdict('')
-    setComparison('')
     setCardsLoading(true)
     openPanel('Personalising your card list…')
 
@@ -85,6 +68,17 @@ export function CardModule({ profileMd, apiKey }) {
             setDisplayCards(cards)
             setCardsPersonalised(true)
             localStorage.setItem(CARDS_CACHE_KEY, JSON.stringify(cards))
+            // Pre-populate breakdowns from Tinyfish's own pros/cons
+            const freshBreakdowns = {}
+            for (const c of cards) {
+              if (c.pros?.length || c.cons?.length) {
+                freshBreakdowns[c.name] = { pros: c.pros || [], cons: c.cons || [], verdict: c.verdict || '' }
+              }
+            }
+            if (Object.keys(freshBreakdowns).length > 0) {
+              setBreakdowns(freshBreakdowns)
+              try { localStorage.setItem(BREAKDOWNS_CACHE_KEY, JSON.stringify(freshBreakdowns)) } catch {}
+            }
           }
         } catch {}
         setCardsLoading(false)
@@ -96,43 +90,7 @@ export function CardModule({ profileMd, apiKey }) {
     })
   }
 
-  // ─── Tinyfish: verdict ───────────────────────────────────────────────────
-
-  function loadVerdict() {
-    if (!apiKey) return
-    if (!displayCards.length) return
-    setVerdictLoading(true)
-    setVerdict('')
-
-    getCardVerdictAI({
-      cards: displayCards,
-      profile,
-      apiKey,
-      onChunk: (_, full) => setVerdict(full),
-      onDone: (full) => { setVerdict(full); setVerdictLoading(false) },
-      onError: (msg) => { setVerdict(`Error: ${msg}`); setVerdictLoading(false) },
-    })
-  }
-
-  // ─── Tinyfish: comparison ────────────────────────────────────────────────
-
-  function loadComparison() {
-    if (!apiKey) return
-    if (!displayCards.length) return
-    setComparisonLoading(true)
-    setComparison('')
-
-    compareCardsAI({
-      cards: displayCards,
-      profile,
-      apiKey,
-      onChunk: (_, full) => setComparison(full),
-      onDone: (full) => { setComparison(full); setComparisonLoading(false) },
-      onError: (msg) => { setComparison(`Error: ${msg}`); setComparisonLoading(false) },
-    })
-  }
-
-  // ─── Per-card breakdown (database → Tinyfish fallback) ──────────────────
+  // ─── Per-card breakdown ──────────────────────────────────────────────────
 
   function toggleBreakdown(card) {
     // Toggle if already loaded
@@ -143,10 +101,9 @@ export function CardModule({ profileMd, apiKey }) {
 
     setExpanded(e => ({ ...e, [card.name]: true }))
 
-    // 1. Check hardcoded database first — instant, no API call
-    const dbCard = findCardInDatabase(card.name)
-    if (dbCard) {
-      const data = { pros: dbCard.pros, cons: dbCard.cons, verdict: dbCard.verdict }
+    // 1. Use pros/cons Tinyfish returned with the card — instant, no extra API call
+    if (card.pros?.length || card.cons?.length) {
+      const data = { pros: card.pros || [], cons: card.cons || [], verdict: card.verdict || '' }
       setBreakdowns(b => {
         const updated = { ...b, [card.name]: data }
         try { localStorage.setItem(BREAKDOWNS_CACHE_KEY, JSON.stringify(updated)) } catch {}
@@ -155,7 +112,7 @@ export function CardModule({ profileMd, apiKey }) {
       return
     }
 
-    // 2. Card not in database — generate from tag instantly, no API call
+    // 2. Fallback: derive from tag (no API call) — for cached cards without pros/cons
     const fallback = generateFallbackBreakdown(card)
     setBreakdowns(b => {
       const updated = { ...b, [card.name]: fallback }
@@ -203,6 +160,7 @@ export function CardModule({ profileMd, apiKey }) {
 
   function openPanel(taskName) {
     setPanel({ taskName, streamingUrl: null, log: [], rawResult: null, status: 'running' })
+    setPanelVisible(true)
   }
   function updatePanel(patch) {
     setPanel(p => p ? { ...p, ...patch } : p)
@@ -216,21 +174,17 @@ export function CardModule({ profileMd, apiKey }) {
 
   const noKeyBanner = null
 
-  // ─── Prose class reuse ────────────────────────────────────────────────────
 
-  const darkProse = `prose prose-sm max-w-none
-    prose-headings:text-cream-50 prose-headings:font-display prose-headings:font-normal prose-headings:text-lg prose-headings:mt-4 prose-headings:mb-2 first:prose-headings:mt-0
-    prose-strong:text-cream-100 prose-strong:font-semibold
-    prose-p:text-cream-200/80 prose-p:leading-relaxed prose-p:my-1
-    prose-li:text-cream-200/70 prose-ul:my-1 prose-ul:space-y-0.5
-    prose-em:text-cream-200/50`
+  const totalSpend = ['dining_spend', 'grocery_spend', 'transport_spend', 'online_spend', 'petrol_spend']
+    .reduce((s, k) => s + parseFloat(profile[k] || 0), 0)
 
-  const lightProse = `prose prose-sm max-w-none
-    prose-h2:font-display prose-h2:text-lg prose-h2:font-normal prose-h2:text-ink-900 prose-h2:mt-4 prose-h2:mb-2 first:prose-h2:mt-0
-    prose-strong:font-semibold prose-strong:text-ink-800
-    prose-p:text-ink-600 prose-p:leading-relaxed prose-p:my-1
-    prose-li:text-ink-600 prose-ul:my-1 prose-ul:space-y-0.5
-    prose-em:text-ink-400`
+  const spendCategories = [
+    { label: 'Dining', key: 'dining_spend', icon: '🍜' },
+    { label: 'Grocery', key: 'grocery_spend', icon: '🛒' },
+    { label: 'Transport', key: 'transport_spend', icon: '🚌' },
+    { label: 'Online', key: 'online_spend', icon: '🛍️' },
+    { label: 'Petrol', key: 'petrol_spend', icon: '⛽' },
+  ].filter(c => parseFloat(profile[c.key] || 0) > 0)
 
   return (
     <div className="space-y-6">
@@ -243,80 +197,127 @@ export function CardModule({ profileMd, apiKey }) {
         </p>
       </div>
 
-      {noKeyBanner}
-
-      {/* ── Verdict ──────────────────────────────────────────────────────── */}
-      <div className="bg-ink-900 text-cream-50 rounded-2xl p-6">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <p className="text-xs text-cream-200/50 uppercase tracking-widest font-mono mb-0.5">Tinyfish reasoning</p>
-            <h3 className="font-display text-xl text-cream-50">Which card should I get?</h3>
-            <p className="text-xs text-cream-200/60 mt-1">
-              Tinyfish checks current offers and picks the single best card for your profile
-            </p>
-          </div>
-          <button
-            onClick={loadVerdict}
-            disabled={verdictLoading || !displayCards.length}
-            title={!displayCards.length ? 'Generate your card list first' : ''}
-            className="flex items-center gap-2 bg-cream-50 text-ink-900 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-cream-200 transition-colors disabled:opacity-50 whitespace-nowrap flex-shrink-0"
-          >
-            {verdictLoading
-              ? <><span className="animate-pulse-soft">●</span> Thinking…</>
-              : <><span>✦</span> Get my verdict</>}
-          </button>
-        </div>
-
-        {!verdict && !verdictLoading && (
-          <p className="text-cream-200/40 text-sm">
-            {displayCards.length
-              ? `${displayCards.length} cards shortlisted for you — press "Get my verdict" for a decisive pick.`
-              : 'Generate your personalised card list first, then get a verdict.'}
-          </p>
-        )}
-        {verdictLoading && !verdict && (
-          <div className="space-y-2">
-            {[80, 65, 90, 55, 75].map((w, i) => (
-              <div key={i} className="shimmer-bg h-3 rounded-md opacity-20" style={{ width: `${w}%` }} />
-            ))}
-          </div>
-        )}
-        {verdict && <div className={darkProse}><ReactMarkdown>{verdict}</ReactMarkdown></div>}
-      </div>
-
-      {/* ── Compare all cards ────────────────────────────────────────────── */}
-      <div className="bg-white border border-cream-200 rounded-2xl p-6">
+      {/* ── Profile snapshot tile ─────────────────────────────────────────── */}
+      <div className="bg-white border border-cream-200 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-xs text-ink-400 uppercase tracking-widest font-mono mb-0.5">Tinyfish reasoning</p>
-            <h3 className="font-display text-xl text-ink-900">Full ranking — all cards</h3>
+            <p className="text-xs text-ink-400 uppercase tracking-widest font-mono mb-0.5">AI context</p>
+            <h3 className="font-display text-base text-ink-900">What Tinyfish knows about you</h3>
           </div>
-          <button
-            onClick={loadComparison}
-            disabled={comparisonLoading || !displayCards.length}
-            className="flex items-center gap-2 bg-ink-900 text-cream-50 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-ink-700 transition-colors disabled:opacity-50 whitespace-nowrap"
-          >
-            {comparisonLoading
-              ? <><span className="animate-pulse-soft">●</span> Ranking…</>
-              : <><span>✦</span> Rank all cards</>}
-          </button>
+          <span className="text-xs bg-sage-400/10 text-sage-600 rounded-full px-2.5 py-1 font-medium">✦ Live</span>
         </div>
 
-        {comparison
-          ? <div className={lightProse}><ReactMarkdown>{comparison}</ReactMarkdown></div>
-          : !comparisonLoading && (
-            <p className="text-ink-400 text-sm">
-              Tinyfish will rank all {displayCards.length || '?'} cards from best to worst for your specific spending profile.
+        {/* Income + total spend */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-ink-900 rounded-xl p-3.5">
+            <p className="text-xs text-cream-200/50 uppercase tracking-wide font-mono mb-1">Annual income</p>
+            <p className="font-display text-xl text-cream-50">
+              SGD {profile.income_monthly
+                ? (parseFloat(profile.income_monthly) * 12).toLocaleString()
+                : '—'}
             </p>
-          )}
-        {comparisonLoading && !comparison && (
-          <div className="space-y-2">
-            {[85, 70, 90, 60, 80].map((w, i) => (
-              <div key={i} className="shimmer-bg h-4 rounded-md" style={{ width: `${w}%` }} />
-            ))}
+            {profile.income_monthly && (
+              <p className="text-xs text-cream-200/50 mt-0.5">
+                SGD {parseInt(profile.income_monthly).toLocaleString()}/mo
+              </p>
+            )}
+          </div>
+          <div className="bg-cream-50 border border-cream-200 rounded-xl p-3.5">
+            <p className="text-xs text-ink-400 uppercase tracking-wide font-mono mb-1">Monthly spend</p>
+            <p className="font-display text-xl text-ink-900">
+              SGD {totalSpend > 0 ? totalSpend.toLocaleString() : '—'}
+            </p>
+            {totalSpend > 0 && (
+              <p className="text-xs text-ink-400 mt-0.5">across {spendCategories.length} categories</p>
+            )}
+          </div>
+        </div>
+
+        {/* Spend breakdown bars */}
+        {spendCategories.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {spendCategories.map(c => {
+              const amt = parseFloat(profile[c.key] || 0)
+              const pct = totalSpend > 0 ? (amt / totalSpend) * 100 : 0
+              return (
+                <div key={c.key}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs text-ink-500">{c.icon} {c.label}</span>
+                    <span className="text-xs font-mono text-ink-700">SGD {amt.toLocaleString()}</span>
+                  </div>
+                  <div className="h-1.5 bg-cream-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-sage-400 rounded-full transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
+
+        {/* Profile chips */}
+        <div className="flex flex-wrap gap-1.5">
+          {profile.citizenship && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1">
+              {profile.citizenship}
+            </span>
+          )}
+          {profile.age && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1">
+              Age {profile.age}
+            </span>
+          )}
+          {profile.preferred_rewards && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1 capitalize">
+              Prefers {profile.preferred_rewards}
+            </span>
+          )}
+          {profile.willing_annual_fee && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1">
+              Annual fee: {profile.willing_annual_fee === 'yes' ? 'OK' : profile.willing_annual_fee === 'waiver' ? 'Waiver only' : 'No'}
+            </span>
+          )}
+          {profile.travel_frequency && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1 capitalize">
+              Travels {profile.travel_frequency}
+            </span>
+          )}
+          {profile.transport_mode && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1 capitalize">
+              {profile.transport_mode.replace(/-/g, ' ')}
+            </span>
+          )}
+          {profile.dining_preference && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1 capitalize">
+              Dining: {profile.dining_preference}
+            </span>
+          )}
+          {profile.card_primary_goal && (
+            <span className="text-xs bg-gold-400/10 text-gold-700 rounded-full px-2.5 py-1">
+              Goal: {profile.card_primary_goal}
+            </span>
+          )}
+          {profile.risk_tolerance && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1">
+              {profile.risk_tolerance.split('—')[0].trim()}
+            </span>
+          )}
+          {profile.existing_debt && profile.existing_debt !== 'none' && (
+            <span className="text-xs bg-cream-100 text-ink-500 rounded-full px-2.5 py-1 capitalize">
+              Debt: {profile.existing_debt}
+            </span>
+          )}
+          {profile.big_purchase_next_year && profile.big_purchase_next_year !== 'none' && (
+            <span className="text-xs bg-sage-400/10 text-sage-600 rounded-full px-2.5 py-1 capitalize">
+              Planning: {profile.big_purchase_next_year}
+            </span>
+          )}
+        </div>
       </div>
+
+      {noKeyBanner}
 
       {/* ── Personalised card list (Tinyfish) ──────────────────────────── */}
       <div>
@@ -330,14 +331,29 @@ export function CardModule({ profileMd, apiKey }) {
               <span className="text-xs text-ink-300 font-mono animate-pulse-soft">Personalising…</span>
             )}
           </div>
-          <button
-            onClick={refreshCardList}
-            disabled={cardsLoading}
-            className="text-xs text-ink-300 hover:text-ink-600 transition-colors disabled:opacity-40"
-            title="Re-run Tinyfish to refresh card picks"
-          >
-            ⟳ Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {panel && (
+              <button
+                onClick={() => setPanelVisible(v => !v)}
+                className={`flex items-center gap-1.5 text-xs rounded-lg px-2.5 py-1.5 font-medium transition-colors
+                  ${panelVisible
+                    ? 'bg-ink-900 text-cream-50 hover:bg-ink-700'
+                    : 'bg-cream-100 text-ink-600 hover:bg-ink-900 hover:text-cream-50'}`}
+              >
+                {cardsLoading
+                  ? <><span className="animate-pulse text-amber-400">✦</span> {panelVisible ? 'Hide' : 'View progress'}</>
+                  : <><span>✦</span> {panelVisible ? 'Hide' : 'View result'}</>}
+              </button>
+            )}
+            <button
+              onClick={refreshCardList}
+              disabled={cardsLoading}
+              className="text-xs text-ink-300 hover:text-ink-600 transition-colors disabled:opacity-40"
+              title="Re-run Tinyfish to refresh card picks"
+            >
+              ⟳ Refresh
+            </button>
+          </div>
         </div>
 
         {displayCards.length === 0 && !cardsLoading && (
@@ -367,6 +383,11 @@ export function CardModule({ profileMd, apiKey }) {
               >
                 {/* Card row */}
                 <div className="flex items-center gap-3 px-4 py-3.5">
+                  {/* Rank badge */}
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold
+                    ${card.rank === 1 ? 'bg-gold-400/20 text-gold-700' : 'bg-cream-100 text-ink-400'}`}>
+                    {card.rank || '—'}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-ink-900 text-sm leading-tight">{card.name}</p>
                     <p className="text-xs text-ink-400">{card.bank}</p>
@@ -474,14 +495,14 @@ export function CardModule({ profileMd, apiKey }) {
       )}
 
       {/* Live browser panel (Tinyfish card list generation) */}
-      {panel && (
+      {panel && panelVisible && (
         <BrowserPanel
           taskName={panel.taskName}
           streamingUrl={panel.streamingUrl}
           log={panel.log}
           rawResult={panel.rawResult}
           status={panel.status}
-          onClose={() => setPanel(null)}
+          onClose={() => setPanelVisible(false)}
         />
       )}
     </div>

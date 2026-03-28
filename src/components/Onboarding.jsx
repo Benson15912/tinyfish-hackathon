@@ -53,6 +53,61 @@ const STEPS = [
     ]
   },
   {
+    id: 'goals',
+    title: 'Your financial goals',
+    subtitle: 'Helps the AI pick cards that actually match what you want your money to do.',
+    fields: [
+      {
+        key: 'card_primary_goal',
+        label: 'What do you mainly want from a credit card?',
+        type: 'select',
+        options: ['cashback on daily spend', 'air miles for travel', 'rewards points', 'shopping & online discounts', 'travel perks & lounges', 'no preference'],
+      },
+      {
+        key: 'monthly_bills_spend',
+        label: 'Monthly bills spend — utilities, phone, subscriptions (SGD)',
+        type: 'number',
+        placeholder: '150',
+      },
+      {
+        key: 'risk_tolerance',
+        label: 'Investment risk appetite',
+        type: 'select',
+        options: ['conservative — preserve capital', 'moderate — balanced growth', 'aggressive — maximise returns'],
+      },
+      {
+        key: 'existing_debt',
+        label: 'Any existing debt?',
+        type: 'select',
+        options: ['none', 'student loan', 'car loan', 'personal loan', 'home loan', 'multiple loans'],
+      },
+      {
+        key: 'emergency_fund',
+        label: 'Emergency fund (months of expenses saved)',
+        type: 'select',
+        options: ['none', 'less than 1 month', '1–3 months', '3–6 months', '6+ months'],
+      },
+      {
+        key: 'big_purchase_next_year',
+        label: 'Big purchase planned in the next 12 months?',
+        type: 'select',
+        options: ['none', 'renovation', 'car', 'wedding', 'overseas holiday', 'electronics / gadgets', 'other'],
+      },
+      {
+        key: 'has_investments',
+        label: 'Do you currently invest?',
+        type: 'select',
+        options: ['yes', 'no — but interested', 'no'],
+      },
+      {
+        key: 'investment_type',
+        label: 'If yes, what do you invest in?',
+        type: 'select',
+        options: ['stocks & ETFs', 'crypto', 'robo-advisor (StashAway, Syfe etc.)', 'SSBs & fixed deposits', 'CPF top-ups only', 'mixed'],
+      },
+    ],
+  },
+  {
     id: 'bto',
     title: 'BTO plans?',
     subtitle: 'Tell us about your housing goals.',
@@ -129,15 +184,26 @@ export function Onboarding({ profileMd, onComplete }) {
                     {field.options.map(o => (
                       <option key={o} value={o}>{o}</option>
                     ))}
+                    <option value="not-sure">Not sure / prefer not to say</option>
                   </select>
                 ) : (
-                  <input
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    className="w-full border border-cream-200 rounded-xl px-4 py-3 text-ink-900 bg-cream-50 focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm"
-                    value={values[field.key] || ''}
-                    onChange={e => handleChange(field.key, e.target.value)}
-                  />
+                  <div>
+                    <input
+                      type={values[field.key] === 'not-sure' ? 'text' : field.type}
+                      placeholder={values[field.key] === 'not-sure' ? 'skipped' : field.placeholder}
+                      disabled={values[field.key] === 'not-sure'}
+                      className="w-full border border-cream-200 rounded-xl px-4 py-3 text-ink-900 bg-cream-50 focus:outline-none focus:ring-2 focus:ring-sage-400 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      value={values[field.key] === 'not-sure' ? '' : (values[field.key] || '')}
+                      onChange={e => handleChange(field.key, e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleChange(field.key, values[field.key] === 'not-sure' ? '' : 'not-sure')}
+                      className="mt-1.5 text-xs text-ink-300 hover:text-ink-500 transition-colors"
+                    >
+                      {values[field.key] === 'not-sure' ? '↩ Enter a value' : 'Not sure — skip this'}
+                    </button>
+                  </div>
                 )}
               </div>
             ))}

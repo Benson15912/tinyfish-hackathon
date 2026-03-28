@@ -1,6 +1,6 @@
 // App.jsx
 import { useState, useEffect } from 'react'
-import { loadProfile, saveProfile, parseProfile } from './lib/profile'
+import { loadProfile, saveProfile, parseProfile, DEFAULT_PROFILE } from './lib/profile'
 import { getStoredApiKey } from './lib/openai'
 import { Onboarding } from './components/Onboarding'
 import { CardModule } from './components/CardModule'
@@ -139,9 +139,10 @@ export default function App() {
         <div className="max-w-2xl mx-auto px-4 flex items-center justify-between">
           <p className="text-xs text-ink-300">adulting.sg — built for Singapore young adults</p>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (window.confirm('Reset profile and start over?')) {
                 localStorage.clear()
+                await saveProfile(DEFAULT_PROFILE)
                 window.location.reload()
               }
             }}
